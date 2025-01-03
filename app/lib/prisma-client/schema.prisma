@@ -1,0 +1,169 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/lib/prisma-client"
+}
+
+model User {
+  id                    String    @id @default(uuid())
+  address               String    @unique
+  balance               Float     @default(0)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  termsSignature        String?
+  termsSignedAt         DateTime?
+  sessionToken          String?
+  sessionTokenExpiresAt DateTime?
+  chats                 Chat[]
+  usages                Usage[]
+  payments              Payment[]
+  memories              Memory[]
+  tasks                 Task[]
+}
+
+model Chat {
+  id        String    @id @default(uuid())
+  title     String
+  userId    String
+  threadId  String    @unique @default(cuid())
+  tools     String    @default("")
+  user      User      @relation(fields: [userId], references: [id])
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  usages    Usage[]
+  memories  Memory[]
+}
+
+model Message {
+  id          String       @id @default(uuid())
+  content     String
+  chatId      String
+  role        String       @default("user")
+  chat        Chat         @relation(fields: [chatId], references: [id])
+  transaction Transaction?
+  memory      Memory?      @relation("MessageMemory", fields: [memoryId], references: [id])
+  memoryId    String?
+  toolData    String?
+  createdAt   DateTime     @default(now())
+}
+
+model Transaction {
+  id        String   @id @default(uuid())
+  messageId String   @unique
+  message   Message  @relation(fields: [messageId], references: [id])
+  data      String
+  hash      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Document {
+  id        String   @id @default(uuid())
+  content   String
+  embedding String
+  metadata  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String
+  createdBy   String
+  status      String
+  priority    Int       @default(1)
+  graphId     String?
+  deadline    DateTime?
+  metadata    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [createdBy], references: [id])
+  graph       Graph?    @relation(fields: [graphId], references: [id])
+}
+
+model Memory {
+  id         String    @id @default(cuid())
+  content    String
+  type       String
+  userId     String
+  chatId     String?
+  importance Float
+  timestamp  DateTime  @default(now())
+  metadata   String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  user       User      @relation(fields: [userId], references: [id])
+  chat       Chat?     @relation(fields: [chatId], references: [id])
+  Message    Message[] @relation("MessageMemory")
+}
+
+model Node {
+  id          String   @id @default(uuid())
+  type        String
+  data        String
+  metadata    String?
+  status      String   @default("PENDING")
+  graph       Graph    @relation(fields: [graphId], references: [id])
+  graphId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  edges       Edge[]   @relation("EdgeSource")
+  targetEdges Edge[]   @relation("EdgeTarget")
+}
+
+model Edge {
+  id        String   @id @default(uuid())
+  type      String
+  source    Node     @relation("EdgeSource", fields: [sourceId], references: [id])
+  sourceId  String
+  target    Node     @relation("EdgeTarget", fields: [targetId], references: [id])
+  targetId  String
+  metadata  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  graph     Graph    @relation(fields: [graphId], references: [id])
+  graphId   String
+}
+
+model Graph {
+  id        String   @id @default(uuid())
+  status    String   @default("ACTIVE")
+  nodes     Node[]
+  edges     Edge[]
+  tasks     Task[]
+  metadata  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Usage {
+  id               String   @id @default(cuid())
+  userId           String
+  chatId           String
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  totalTokens      Int      @default(0)
+  totalCost        Float    @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id])
+  chat             Chat     @relation(fields: [chatId], references: [id])
+
+  @@unique([userId, chatId])
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  sessionId String   @unique
+  txHash    String   @unique
+  amount    Float
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+}
